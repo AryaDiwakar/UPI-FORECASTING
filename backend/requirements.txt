@@ -1,6 +1,6 @@
 fastapi==0.109.0
 uvicorn==0.27.0
-pandas==2.2.0
+pandas>=2.2.3
 numpy==1.26.3
 requests==2.31.0
 beautifulsoup4==4.12.3
