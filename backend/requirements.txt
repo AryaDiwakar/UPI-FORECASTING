@@ -8,7 +8,6 @@ lxml>=5.1.0
 scikit-learn>=1.4.0
 statsmodels>=0.14.1
 prophet>=1.1.5
-tensorflow>=2.15.0
 matplotlib>=3.8.0
 seaborn>=0.13.0
 python-multipart>=0.0.6
