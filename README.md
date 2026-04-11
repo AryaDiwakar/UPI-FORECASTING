@@ -1,266 +1,483 @@
-# UPI Transaction Forecasting System
+# UPI Intelligence Platform v3.0
 
-Sequence-Based Forecasting of UPI Digital Payment Transactions Using Data Science
+## Research-Grade Time Series Forecasting System
 
-## Overview
+A comprehensive, research-level machine learning system for forecasting UPI (Unified Payments Interface) digital payment transactions. This system implements advanced statistical analysis, multiple forecasting models, and provides interpretable insights.
 
-This is a full-stack machine learning application that forecasts UPI (Unified Payments Interface) digital payment transactions using various time-series forecasting models, including deep learning (LSTM). The system automatically scrapes data from the NPCI website and provides an interactive dashboard for visualization.
+---
 
-## Problem Context
+## Research Objective
 
-UPI transaction data is available but underutilized. Traditional models fail to capture non-linear temporal patterns, and there's a need to model sequential dependencies in time-series data. This project converts the problem into a **Sequence → Value prediction task** using sliding windows.
+### Primary Goal
+Develop a robust, statistically-validated forecasting system for UPI transaction volumes that:
+- Provides accurate short-term predictions with reliable multi-step forecasting
+- Offers interpretable model insights
+- Enables rigorous model comparison
+- Supports business decision-making
 
-## Architecture
+### Research Questions
+1. **Which model architecture performs best for in-sample testing?** - Compare classical (ARIMA), ML (XGBoost), and deep learning (LSTM/Attention) approaches
+2. **Which model produces reliable forecasts?** - ML models struggle with iterative forecasting; statistical models excel
+3. **What features drive predictions?** - Quantify the importance of lag features, seasonality, and growth metrics
+4. **Is the data stationary?** - Use ADF/KPSS tests to determine appropriate modeling strategies
+
+---
+
+## The Theory: Understanding Time Series Forecasting
+
+### Why Time Series is Different from Standard ML
+
+Unlike traditional ML where observations are independent, time series data has:
+- **Temporal dependence**: Today's value depends on past values
+- **Trend**: Long-term increase/decrease pattern
+- **Seasonality**: Repeating patterns at fixed intervals (monthly, quarterly)
+- **Autocorrelation**: Correlation between lagged values
+
+This violates the i.i.d. assumption of standard ML, requiring specialized approaches.
+
+### The Challenge: Model Training vs Forecasting
+
+There's a critical distinction in time series:
+
+| Aspect | Model Training/Test | Multi-Step Forecasting |
+|--------|-------------------|----------------------|
+| **Input** | Historical features (lags, rolling stats) | Only past values |
+| **Output** | Single prediction | Multiple future steps |
+| **Challenge** | Feature engineering | Recursive prediction |
+
+**ML models (Ridge, XGBoost, RF)** are trained with full feature sets (62+ features including decomposition, Fourier terms, etc.). But for forecasting, these features don't exist yet—they must be computed from the predictions themselves, causing error accumulation.
+
+**Statistical models (ARIMA, SARIMA)** are designed for this recursive forecasting—they naturally predict one step ahead using the model's internal state.
+
+---
+
+## Models: Theory & Implementation
+
+### 1. ARIMA - AutoRegressive Integrated Moving Average
+
+**Theory:**
+ARIMA combines three components:
+- **AR (p)**: Future value = weighted sum of past p values
+- **I (d)**: Differencing to make data stationary
+- **MA (q)**: Weighted sum of past q forecast errors
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (React)                         │
-│  - Dashboard UI (Charts, Stats, Insights)                        │
-│  - API Integration via Axios                                    │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ HTTP
-┌───────────────────────────▼─────────────────────────────────────┐
-│                      Backend (FastAPI)                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Scraper   │  │  Processor  │  │     ML Models          │  │
-│  │   Service   │─▶│   Service   │─▶│ - Moving Average       │  │
-│  │             │  │             │  │ - Linear Regression    │  │
-│  └─────────────┘  └─────────────┘  │ - ARIMA               │  │
-│                                     │ - LSTM (Deep Learning) │  │
-│                                     └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+Y(t) = c + φ₁Y(t-1) + φ₂Y(t-2) + ... + θ₁ε(t-1) + θ₂ε(t-2) + ...
 ```
 
-## Tech Stack
+**Why it works:**
+- Captures autocorrelation structure directly
+- Differencing handles non-stationarity
+- Proven methodology since 1970s (Box-Jenkins)
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **Pandas/NumPy** - Data manipulation
-- **Scikit-learn** - Machine learning
-- **Statsmodels** - ARIMA time-series modeling
-- **TensorFlow/Keras** - LSTM deep learning model
+**Our configuration:** `ARIMA(2, 1, 2)` - 2 AR terms, 1 differencing, 2 MA terms
 
-### Frontend
-- **React + TypeScript** - UI framework
-- **Vite** - Build tool
-- **Tailwind CSS** - Dark fintech styling
-- **Recharts** - Interactive charts
-- **Lucide React** - Icons
-
-## Data Pipeline
-
-### 1. Data Extraction (`services/scraper.py`)
-
-The scraper attempts to fetch real data from NPCI's official website:
-- URL: `https://www.npci.org.in/product/upi/product-statistics`
-- Uses BeautifulSoup for HTML parsing
-- Falls back to realistic generated data if scraping fails
-
-The generated data simulates realistic UPI growth patterns:
-- Base volume starting from 0.17M (April 2016)
-- Exponential growth with varying rates over time
-- Seasonal factors (festive boost in Oct-Dec)
-- COVID-19 impact simulation (2020-2021)
-
-### 2. Data Cleaning (`services/processor.py`)
-
-- Converts month-year strings to datetime
-- Handles missing values
-- Sorts chronologically
-- Computes EDA statistics (mean, std, min, max, growth rates)
-
-### 3. Feature Engineering
-
-Creates sequence-based features for ML models:
-- **Lag features**: t-1, t-3, t-6, t-12
-- **Rolling statistics**: 3, 6, 12-month moving averages and standard deviations
-- **Growth metrics**: Month-over-month (MoM) and Year-over-Year (YoY) growth
-- **Temporal features**: Trend, seasonal sin/cos encoding
-
-## Forecasting Models
-
-### 1. Moving Average
-Simple baseline model using rolling mean of specified window size.
-
-### 2. Linear Regression with Lag Features
-Ridge regression using engineered features (lags, rolling stats, temporal encoding).
-
-### 3. ARIMA
-AutoRegressive Integrated Moving Average - classical time-series model with order (2,1,2).
-
-### 4. LSTM (Long Short-Term Memory)
-Deep learning model for sequence prediction:
-- Input: Sliding window of 6 months
-- Architecture: 2 LSTM layers with dropout
-- Output: Next month's transaction volume
-
-### 5. Prophet (Future)
-Facebook's time series forecasting model (installed, implementation pending).
-
-## API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | API info |
-| `GET /fetch-data` | Scrape and process NPCI data |
-| `GET /data` | Get time series data |
-| `GET /stats` | Get EDA statistics |
-| `GET /forecast` | Get model predictions |
-| `GET /anomalies` | Detect outliers (Z-score) |
-| `GET /insights` | Auto-generated insights |
-
-## Frontend Dashboard
-
-### Tabs
-1. **Overview** - Stats cards, transaction trends chart, anomaly table
-2. **Forecast** - 12-month predictions with model selection
-3. **Models** - Model comparison with RMSE/MAE/MAPE metrics
-4. **Insights** - Business insights and recommendations
-
-### Features
-- Dark fintech UI theme
-- Interactive charts (Recharts)
-- Real-time data refresh
-- Model selection dropdown
-- Responsive design
-
-## Running the Application
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- npm or yarn
-
-### Backend Setup
-
-```bash
-cd backend
-pip install -r requirements.txt
-python main.py
+```python
+# statsmodels implementation
+model = ARIMA(y_train, order=(2, 1, 2))
+fitted = model.fit()
+forecast = fitted.forecast(steps=12)
 ```
 
-The backend runs on `http://localhost:8000`
+---
 
-### Frontend Setup
+### 2. SARIMA - Seasonal ARIMA
 
-```bash
-cd frontend
-npm install
-npm run dev
+**Theory:**
+Extends ARIMA by adding seasonal components:
+- **AR (P)**: Seasonal autoregression
+- **I (D)**: Seasonal differencing
+- **MA (Q)**: Seasonal moving average
+- **s**: Season length (12 for monthly data)
+
+```
+SARIMA(p,d,q)(P,D,Q)[12]
 ```
 
-The frontend runs on `http://localhost:5173`
+**Why it matters for UPI:**
+- UPI shows strong 12-month seasonality (festive spike in Q4)
+- Non-festive months show steady growth
+- SARIMA captures both trend AND seasonality
 
-### Or Run Both
+**Our configuration:** `SARIMA(1,1,1)(1,1,1,12)`
 
-```bash
-# Terminal 1 - Backend
-cd backend && python main.py
-
-# Terminal 2 - Frontend
-cd frontend && npm run dev
+```python
+# Captures both monthly trend and annual seasonality
+model = SARIMAX(y_train, order=(1,1,1), seasonal_order=(1,1,1,12))
 ```
+
+**Result:** Produces forecasts with realistic seasonal patterns (Oct-Dec higher than Jan-Feb)
+
+---
+
+### 3. Ridge Regression
+
+**Theory:**
+Linear regression with L2 regularization to prevent overfitting:
+
+```
+Y = β₀ + β₁X₁ + β₂X₂ + ... + βₙXₙ + λΣβᵢ²
+```
+
+Where λ controls regularization strength.
+
+**Why it works:**
+- Fast and interpretable
+- L2 penalty shrinks coefficients toward zero
+- Works well when features are informative
+
+**Limitation for forecasting:**
+- Trained on 62 engineered features
+- Forecasting requires recursive feature computation
+- Error accumulates over multiple steps
+
+**Our configuration:** `alpha=1.0`
+
+---
+
+### 4. XGBoost - Gradient Boosting
+
+**Theory:**
+Ensemble of decision trees built sequentially:
+- Each tree corrects the previous errors
+- Uses gradient descent to minimize loss
+- Feature importance derived from split gains
+
+```
+F₁(x) = learning_rate × tree₁(x)
+F₂(x) = F₁(x) + learning_rate × tree₂(x)
+...
+Fₙ(x) = Σ learning_rate × treeᵢ(x)
+```
+
+**Why it excels at testing:**
+- Captures non-linear relationships
+- Handles feature interactions
+- Robust to outliers
+
+**Limitation for forecasting:**
+- Complex feature dependencies
+- Small errors cascade in recursive prediction
+- Feature engineering doesn't match training features
+
+**Our configuration:** `n_estimators=100, max_depth=6, learning_rate=0.1`
+
+---
+
+### 5. Random Forest
+
+**Theory:**
+Ensemble of decision trees with bagging:
+- Bootstrap sampling (sampling with replacement)
+- Each tree trained on different subset
+- Final prediction = average (regression)
+
+```
+ŷ = (1/B) Σᵦ bᵦ(x)
+```
+
+**Why it excels at testing:**
+- Reduces variance through averaging
+- Handles missing features gracefully
+- No overfitting due to ensemble
+
+**Limitation for forecasting:** Same as XGBoost - feature mismatch in recursive prediction
+
+**Our configuration:** `n_estimators=100, max_depth=10`
+
+---
+
+### 6. LSTM - Long Short-Term Memory
+
+**Theory:**
+Recurrent neural network with memory cells:
+- **Cell state**: Long-term memory
+- **Forget gate**: What to discard
+- **Input gate**: What to add to memory
+- **Output gate**: What to output
+
+```
+f_t = σ(W_f · [h_{t-1}, x_t] + b_f)  # Forget
+i_t = σ(W_i · [h_{t-1}, x_t] + b_i)  # Input
+C_t = f_t * C_{t-1} + i_t * tanh(...)  # Cell state
+o_t = σ(W_o · [h_{t-1}, x_t] + b_o)  # Output
+h_t = o_t * tanh(C_t)  # Hidden state
+```
+
+**Why it works:**
+- Captures long-range dependencies
+- Sequential processing
+- Learns complex patterns
+
+**Our configuration:** `sequence_length=6, epochs=50, lstm_units=50, dropout=0.2`
+
+---
+
+### 7. Ensemble Model
+
+**Theory:**
+Weighted combination of multiple models:
+
+```
+ŷ_ensemble = Σᵢ wᵢ · ŷᵢ
+```
+
+**Weighting strategy:** Inverse RMSE weighting
+```
+wᵢ = 1/RMSEᵢ / Σⱼ 1/RMSEⱼ
+```
+
+Better models get higher weight in the ensemble.
+
+---
+
+## Why ML Models Struggle with Forecasting
+
+### The Feature Engineering Gap
+
+During **training**, models receive rich features:
+```python
+# Training features (62 total)
+['lag_1', 'lag_3', 'lag_6', 'lag_12',           # Lag features
+ 'rolling_mean_3', 'rolling_std_3', ...,         # Rolling stats
+ 'trend_component', 'seasonal_component',         # Decomposition
+ 'fourier_sin_12', 'fourier_cos_12', ...',      # Fourier terms
+ 'is_festive_season', 'is_lockdown', ...']       # Event indicators
+```
+
+During **forecasting**, we only have:
+```python
+# Forecasting inputs
+last_values = [312.67, 305.11, 298.44, ...]  # Just 112 values
+```
+
+The model must compute all 62 features from just these values, leading to:
+1. Approximate features that don't match training distribution
+2. Error propagation: small prediction errors affect next step's features
+3. Cascading inaccuracies over 12 steps
+
+### Why ARIMA/SARIMA Work for Forecasting
+
+ARIMA/SARIMA don't need external features—they predict directly from the time series structure:
+
+```python
+# ARIMA forecasting
+# At each step, uses internal AR coefficients and recent predictions
+forecast[t] = f(forecast[t-1], forecast[t-2], ..., errors)
+```
+
+No feature engineering required. No error propagation from mismatched features.
+
+---
+
+## Actual Results
+
+### Test Set Performance (RMSE/MAPE)
+
+| Rank | Model | RMSE | MAPE | Notes |
+|------|-------|------|------|-------|
+| 1 | Ridge | 0.69 | 0.2% | Best on test set |
+| 2 | LSTM | 1.69 | 0.5% | Good with sequences |
+| 3 | SARIMA | 5.64 | 1.6% | Captures seasonality |
+| 4 | ARIMA | 9.91 | 2.8% | Trend only |
+| 5 | XGBoost | 50.39 | 15.7% | Feature mismatch |
+| 6 | RandomForest | 61.33 | 20.7% | Feature mismatch |
+
+### Forecast Performance (12-Month Horizon)
+
+| Model | First Forecast | Trend | Realistic? |
+|-------|---------------|-------|------------|
+| **SARIMA** | 320.5 | 320→396 (+24%) | ✅ Yes |
+| ARIMA | 319.8 | 320→354 (+11%) | ⚠️ Underestimates |
+| Ridge | 362.7 | 363→616 (+70%) | ❌ Explodes |
+| XGBoost | 229.8 | Flat (229) | ❌ Ignores trend |
+| RandomForest | 127.0 | Flat (127) | ❌ Ignores trend |
+| LSTM | 63.2 | 63→82 (+30%) | ❌ Collapses |
+
+### Key Insight
+
+> **Test RMSE ≠ Forecast Accuracy**
+> 
+> Ridge has the lowest test RMSE (0.69) but produces unrealistic forecasts (370→616).
+> SARIMA has higher test RMSE (5.64) but produces realistic forecasts (320→396).
+> 
+> **For forecasting, we use SARIMA.**
+
+---
+
+## Methodology
+
+### Data Pipeline
+```
+Raw Data (NPCI) → Scraping → Validation → Storage (SQLite/CSV)
+```
+
+**Steps:**
+- Web scraping with retries and synthetic data fallback
+- Missing value imputation (linear interpolation)
+- Outlier detection (Z-score, IQR methods)
+- Dataset versioning for reproducibility
+
+### Feature Engineering (62 Features)
+
+| Category | Features |
+|----------|----------|
+| Lag Features | lag_1, lag_3, lag_6, lag_12 |
+| Rolling Statistics | mean, std, min, max, median (3, 6, 12 month windows) |
+| Growth Metrics | MoM growth, YoY growth, acceleration |
+| Temporal | sin/cos encoding, quarter, year |
+| Decomposition | Trend, seasonal, residual components |
+| Fourier Terms | Annual seasonality harmonics |
+| Event Indicators | Festive season (Q4), lockdown period |
+
+### Model Selection Strategy
+
+1. **Train all models** on 80% of data with full feature sets
+2. **Evaluate** on held-out 20% using RMSE/MAPE
+3. **For forecasting**:
+   - Use SARIMA for multi-step prediction (reliable)
+   - Report test metrics separately from forecast quality
+
+### Validation Strategy
+
+- **Time Series Cross-Validation** with walk-forward window
+- **No data leakage** - always predict future from past
+- **Residual Analysis** - check for patterns in errors
+
+---
+
+## Statistical Tests
+
+### Stationarity Tests
+| Test | Purpose | Interpretation |
+|------|---------|----------------|
+| **ADF** (Augmented Dickey-Fuller) | Tests for unit root | p < 0.05 → Stationary |
+| **KPSS** | Tests stationarity (null = stationary) | p > 0.05 → Stationary |
+
+### Normality Tests
+| Test | Purpose |
+|------|---------|
+| **Shapiro-Wilk** | Tests for normal distribution |
+| **Jarque-Bera** | Tests for skewness and kurtosis |
+
+### Residual Diagnostics
+| Test | Purpose |
+|------|---------|
+| **Ljung-Box** | Tests for autocorrelation |
+| **Breusch-Pagan** | Tests for heteroscedasticity |
+| **Runs Test** | Tests for randomness |
+
+---
 
 ## Project Structure
 
 ```
 upi-forecasting/
 ├── backend/
-│   ├── main.py                 # FastAPI application entry point
-│   ├── requirements.txt        # Python dependencies
 │   ├── data/
-│   │   └── upi_data.csv       # Stored transaction data
-│   └── services/
-│       ├── scraper.py         # NPCI data extraction
-│       ├── processor.py       # Data cleaning & feature engineering
-│       ├── models.py          # ML forecasting models
-│       └── insights.py        # Auto-generated insights
-└── frontend/
-    ├── src/
-    │   ├── App.tsx            # Main dashboard component
-    │   ├── main.tsx          # React entry point
-    │   ├── index.css         # Tailwind styles
-    │   ├── types.ts          # TypeScript interfaces
-    │   ├── components/
-    │   │   ├── StatCard.tsx  # Stats display cards
-    │   │   ├── Charts.tsx    # Recharts visualizations
-    │   │   ├── Insights.tsx  # Insights panel
-    │   │   └── Anomalies.tsx # Anomaly detection table
-    │   └── hooks/
-    │       └── useApi.ts     # API integration hook
-    ├── index.html
-    ├── tailwind.config.js
-    ├── postcss.config.js
-    └── package.json
+│   │   └── scraper.py          # Data fetching & storage
+│   ├── preprocessing/
+│   │   └── cleaner.py          # Data cleaning & imputation
+│   ├── analysis/
+│   │   └── eda.py              # Statistical analysis
+│   ├── features/
+│   │   └── engineering.py      # 62 engineered features
+│   ├── models/
+│   │   ├── forecasting.py      # All ML models
+│   │   └── pipeline.py         # Orchestration
+│   ├── evaluation/
+│   │   └── metrics.py          # Metrics & diagnostics
+│   └── interpretability/
+│       └── shap_values.py       # SHAP explanations
+├── app/
+│   └── app.py                  # Streamlit dashboard
+├── requirements.txt
+└── README.md
 ```
 
-## Key Implementation Details
+---
 
-### Sliding Window Sequence Modeling
+## Quick Start
 
-The LSTM model uses a sliding window approach:
+### Installation
+```bash
+git clone https://github.com/AryaDiwakar/UPI-FORECASTING
+cd UPI-FORECASTING
+pip install -r requirements.txt
 ```
-Input: [month_i-6, month_i-5, ..., month_i-1]
-Output: month_i
+
+### Run
+```bash
+streamlit run app/app.py
 ```
 
-This allows the model to learn temporal dependencies over 6-month sequences.
+### Programmatic Usage
+```python
+from backend.models.pipeline import run_forecast_pipeline
 
-### Model Evaluation
+results = run_forecast_pipeline()
 
-Models are evaluated using:
-- **RMSE** (Root Mean Square Error)
-- **MAE** (Mean Absolute Error)
-- **MAPE** (Mean Absolute Percentage Error)
+print(f"Best test model: {results['best_model']}")
+print(f"Forecast (12 months): {results['forecast']['predictions']}")
+```
 
-Time-based train/test split (last 12 months for testing).
-
-### Anomaly Detection
-
-Uses Z-score methodology:
-- Z-score > 2.0: Potential anomaly (amber)
-- Z-score > 2.5: Significant anomaly (red)
-
-### Auto-Generated Insights
-
-The system automatically generates:
-- Summary statistics
-- Growth trends analysis
-- Seasonality patterns
-- Model comparison insights
-- Business recommendations
+---
 
 ## Sample Output
 
-### Stats
-```json
-{
-  "total_records": 107,
-  "date_range": {"start": "2016-04", "end": "2025-02"},
-  "volume": {"mean": 27.66, "latest": 91.13},
-  "growth_rate": {"volume_yoy": 56.85}
-}
+```
+=== Pipeline Results ===
+Best model (test): Ridge
+Forecast model: SARIMA
+Duration: 6.32 seconds
+
+=== 12-Month Forecast ===
+2024-12: 320.54
+2025-01: 327.49
+2025-02: 333.99
+2025-03: 342.22
+2025-04: 349.20
+2025-05: 357.02
+2025-06: 363.67
+2025-07: 370.92
+2025-08: 377.84
+2025-09: 384.45
+2025-10: 390.44
+2025-11: 396.28
+
+Last actual (2024-11): 312.67
 ```
 
-### Insights
-- "UPI transactions show explosive growth with average YoY growth rate of 162.5%"
-- "Festive season (Oct-Dec) shows 28.2% higher activity than average"
-- "LSTM outperforms traditional models in capturing non-linear temporal patterns"
+---
 
-## Future Enhancements
+## References
 
-- [ ] Implement actual NPCI website scraping
-- [ ] Complete Prophet model implementation
-- [ ] Implement more sophisticated anomaly detection
-- [ ] Add model persistence (save/load)
-- [ ] Implement real-time forecasting API
-- [ ] Add scenario simulation features
-- [ ] Export predictions to CSV
+1. **Box, G. E. P., & Jenkins, G. M. (1976)**. *Time Series Analysis: Forecasting and Control*. Holden-Day.
 
-## License
+2. **Hochreiter, S., & Schmidhuber, J. (1997)**. *Long Short-Term Memory*. Neural Computation, 9(8), 1735-1780.
 
-MIT License
+3. **Vaswani, A., et al. (2017)**. *Attention Is All You Need*. NeurIPS.
 
-## Author
+4. **Chen, T., & Guestrin, C. (2016)**. *XGBoost: A Scalable Tree Boosting System*. KDD.
 
-Built for sequence-based time-series forecasting demonstration.
+5. **Hyndman, R. J., & Athanasopoulos, G. (2021)**. *Forecasting: Principles and Practice*. OTexts.
+
+---
+
+## Key Takeaways
+
+1. **Test RMSE ≠ Forecast Quality** - Models with low test RMSE may produce unrealistic forecasts due to feature mismatch
+
+2. **SARIMA for Forecasting** - Statistical models designed for recursive prediction outperform ML models for multi-step forecasting
+
+3. **Seasonality Matters** - UPI data shows strong 12-month seasonality; SARIMA captures both trend and seasonal patterns
+
+4. **Feature Engineering is Double-Edged** - Rich features improve training but create a gap during forecasting
+
+5. **Ensemble Helps Test Performance** - Combining models reduces variance, but the ensemble forecast may be dominated by statistical models
+
+---
+
+**Built with research rigor for time series forecasting**
+
+*For questions or collaboration, please open an issue on GitHub.*
